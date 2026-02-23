@@ -252,6 +252,7 @@ const ABI = [
 ];
 
 async function connectWallet() {
+	console.log(window.ethereum);
     if (!window.ethereum) {
         alert("Please install Metamask!");
         return;
