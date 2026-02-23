@@ -3,7 +3,7 @@
 let provider;
 let signer;
 let contract;
-const CONTRACT_ADDRESS = "0x80D2B7E7AEe743e1781B483c1910E67F2a7059C1";
+const CONTRACT_ADDRESS = "0xA9F95f6172460079c5a46aEF3A103A8C9eb0e42C";
 const ABI = [
 	{
 		"inputs": [
@@ -22,6 +22,36 @@ const ABI = [
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
+	},
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "issuedBy",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "soldierId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256[]",
+				"name": "boxIndexes",
+				"type": "uint256[]"
+			}
+		],
+		"name": "BoxesIssued",
+		"type": "event"
 	},
 	{
 		"inputs": [
@@ -53,11 +83,6 @@ const ABI = [
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
-	},
-	{
-		"inputs": [],
-		"stateMutability": "nonpayable",
-		"type": "constructor"
 	},
 	{
 		"inputs": [
@@ -157,14 +182,19 @@ const ABI = [
 		"name": "getRecord",
 		"outputs": [
 			{
+				"internalType": "address",
+				"name": "issuedBy",
+				"type": "address"
+			},
+			{
 				"internalType": "uint256",
 				"name": "soldierId",
 				"type": "uint256"
 			},
 			{
-				"internalType": "uint256",
-				"name": "boxCount",
-				"type": "uint256"
+				"internalType": "uint256[]",
+				"name": "boxIndexes",
+				"type": "uint256[]"
 			},
 			{
 				"internalType": "uint256",
@@ -231,13 +261,13 @@ const ABI = [
 		"name": "records",
 		"outputs": [
 			{
-				"internalType": "uint256",
-				"name": "soldierId",
-				"type": "uint256"
+				"internalType": "address",
+				"name": "issuedBy",
+				"type": "address"
 			},
 			{
 				"internalType": "uint256",
-				"name": "boxCount",
+				"name": "soldierId",
 				"type": "uint256"
 			},
 			{
@@ -266,6 +296,10 @@ async function connectWallet() {
     document.getElementById("addr").innerText=address;
     document.getElementById("is_connected").innerHTML="CONNECTED";
     document.getElementById("btnconnected").style.display="none";
+	contract.on("BoxesIssued", async () => {
+        console.log("BoxesIssued event detected!");
+        await loadLedgerFromBlockchain();
+    });
 }
 function generateHash(text) {
     return ethers.utils.keccak256(ethers.utils.toUtf8Bytes(text));
@@ -436,48 +470,50 @@ async function issueBoxes() {
     alert("Boxes Issued!");
 
     // Add to ledger
-    addToLedger(
-        sid,
-        currentBoxes,
-        receipt.transactionHash
-    );
+    
 
     // Reset
     currentBoxes = [];
 }
 
-function addToLedger(soldierId, boxes, txHash) {
+async function loadLedgerFromBlockchain() {
 
     const table = document.getElementById("ledgerBody");
+    table.innerHTML = "";
 
-    // Current Time
-    const now = new Date();
+    const count = await contract.getRecordCount();
 
-    const time =
-        now.getHours().toString().padStart(2, "0") + ":" +
-        now.getMinutes().toString().padStart(2, "0") + ":" +
-        now.getSeconds().toString().padStart(2, "0");
+    for (let i = 0; i < count; i++) {
 
-    // Convert boxes to string
-    const boxText = boxes.join(",");
+        const record = await contract.getRecord(i);
 
-    // Short hash (UI look)
-    const shortHash =
-        txHash.substring(0, 10) +
-        "..." +
-        txHash.substring(txHash.length - 6);
+        const issuedBy = record[0];
+        const soldierId = record[1];
+        const boxIndexes = record[2];
+        const timestamp = Number(record[3]);
 
-    // Create row
-    const row = document.createElement("tr");
+        const date = new Date(timestamp * 1000);
 
-    row.innerHTML = `
-        <td>${time}</td>
-        <td>${soldierId}</td>
-        <td>ISSUED</td>
-        <td>${boxText}</td>
-        <td class="tx-hash">${shortHash}</td>
-    `;
+        const time =
+            date.getHours().toString().padStart(2, "0") + ":" +
+            date.getMinutes().toString().padStart(2, "0") + ":" +
+            date.getSeconds().toString().padStart(2, "0");
 
-    // Add on top
-    table.prepend(row);
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+            <td>${time}</td>
+            <td>${soldierId}</td>
+            <td>ISSUED</td>
+            <td>${boxIndexes.join(", ")}</td>
+            <td class="tx-hash">${issuedBy.slice(0,6)}...${issuedBy.slice(-4)}</td>
+        `;
+
+        table.prepend(row);
+    }
+}
+if (contract) {
+    contract.on("BoxesIssued", async () => {
+        await loadLedgerFromBlockchain();
+    });
 }
