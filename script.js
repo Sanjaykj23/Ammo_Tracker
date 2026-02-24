@@ -283,237 +283,239 @@ const ABI = [
 
 async function connectWallet() {
 	console.log(window.ethereum);
-    if (!window.ethereum) {
-        alert("Please install Metamask!");
-        return;
-    }
-    provider = new ethers.providers.Web3Provider(window.ethereum);
-    await window.ethereum.request({ method: "eth_requestAccounts" });
-    signer = provider.getSigner();
-    contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
-    alert("Wallet Conneted!");
-    let address=await signer.getAddress();
-    document.getElementById("addr").innerText=address;
-    document.getElementById("is_connected").innerHTML="CONNECTED";
-    document.getElementById("btnconnected").style.display="none";
+	if (!window.ethereum) {
+		alert("Please install Metamask!");
+		return;
+	}
+	provider = new ethers.providers.Web3Provider(window.ethereum);
+	await window.ethereum.request({ method: "eth_requestAccounts" });
+	signer = provider.getSigner();
+	contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+	alert("Wallet Conneted!");
+	let address = await signer.getAddress();
+	document.getElementById("addr").innerText = address;
+	document.getElementById("is_connected").innerHTML = "CONNECTED";
+	document.getElementById("btnconnected").style.display = "none";
+	const count = await contract.getRecordCount();
+	document.getElementById("cnt").innerText = count;
+	await loadLedgerFromBlockchain();
 	contract.on("BoxesIssued", async () => {
-        console.log("BoxesIssued event detected!");
-        await loadLedgerFromBlockchain();
-    });
+		console.log("BoxesIssued event detected!");
+		await loadLedgerFromBlockchain();
+	});
 }
 function generateHash(text) {
-    return ethers.utils.keccak256(ethers.utils.toUtf8Bytes(text));
+	return ethers.utils.keccak256(ethers.utils.toUtf8Bytes(text));
 }
 async function addBox() {
-    const boxId = document.getElementById("box_id").value;
-    const boxBatch = document.getElementById("batch").value;
-    const data = boxId + boxBatch;
-    const hash = generateHash(data);
-    console.log(hash,`Data : ${boxId} ${boxBatch}`);
-    const tx = await contract.addBox(Number(boxId), hash);
-    await tx.wait();
-    let countvalue=document.getElementById("cnt").value;
-    countvalue+=1;
-    document.getElementById("cnt").innerText=countvalue;
-    alert('Box Added!');
+	const boxId = document.getElementById("box_id").value;
+	const boxBatch = document.getElementById("batch").value;
+	const data = boxId + boxBatch;
+	const hash = generateHash(data);
+	console.log(hash, `Data : ${boxId} ${boxBatch}`);
+	const tx = await contract.addBox(Number(boxId), hash);
+	await tx.wait();
+	let countvalue =  await contract.getRecordCount();
+	countvalue += 1;
+	document.getElementById("cnt").innerText = countvalue;
+	alert('Box Added!');
 }
 async function getFreeBoxes() {
-    const free = await contract.getFreeBoxes();
-    return free.map(x => Number(x));
+	const free = await contract.getFreeBoxes();
+	return free.map(x => Number(x));
 }
 
 function pickRandom(arr, count) {
-    let result = new Set();
-    while (result.size < count) {
-        let r = Math.floor(Math.random() * arr.length);
-        result.add(arr[r]);
-    }
-    return Array.from(result);
+	let result = new Set();
+	while (result.size < count) {
+		let r = Math.floor(Math.random() * arr.length);
+		result.add(arr[r]);
+	}
+	return Array.from(result);
 }
 function showSelectedBoxes(arr) {
-    document.getElementById("selected").innerText = "Assigned Boxes " + arr.join(" , ");
+	document.getElementById("selected").innerText = "Assigned Boxes " + arr.join(" , ");
 }
 let currentBoxes = [];
 
 async function logBoxHashes() {
 
-    console.log("---- BOX HASH TEST ----");
+	console.log("---- BOX HASH TEST ----");
 
-    for (let index of currentBoxes) {
-        const hash = await contract.getBoxHash(index);
-        console.log(
-            "Box Index:",
-            index,
-            "→ Hash:",
-            hash
-        );
-    }
+	for (let index of currentBoxes) {
+		const hash = await contract.getBoxHash(index);
+		console.log(
+			"Box Index:",
+			index,
+			"→ Hash:",
+			hash
+		);
+	}
 
-    console.log("------------------------");
+	console.log("------------------------");
 }
 
 async function requestBoxes() {
 
-    const sid = document.getElementById("soldier-id").value;
-    const need = Number(document.getElementById("max-quantity").value);
+	const sid = document.getElementById("soldier-id").value;
+	const need = Number(document.getElementById("max-quantity").value);
 
-    if (!sid || !need) {
-        alert("Fill Soldier ID and Count");
-        return;
-    }
+	if (!sid || !need) {
+		alert("Fill Soldier ID and Count");
+		return;
+	}
 
-    const free = await getFreeBoxes();
+	const free = await getFreeBoxes();
 
-    if (free.length < need) {
-        alert("Not enough boxes");
-        return;
-    }
+	if (free.length < need) {
+		alert("Not enough boxes");
+		return;
+	}
 
-    // Pick random free boxes
-    currentBoxes = pickRandom(free, need);
-    await logBoxHashes();
+	// Pick random free boxes
+	currentBoxes = pickRandom(free, need);
+	await logBoxHashes();
 
-    console.log("Selected Box Indexes: ", currentBoxes);
-    
+	console.log("Selected Box Indexes: ", currentBoxes);
 
-    // Container for hash inputs
-    const container = document.getElementById("hash-inputs-container");
-    container.innerHTML = "<h3>Enter Hash Values:</h3>";
 
-    // Create inputs
-    for (let i = 0; i < need; i++) {
+	// Container for hash inputs
+	const container = document.getElementById("hash-inputs-container");
+	container.innerHTML = "<h3>Enter Hash Values:</h3>";
 
-        const input = document.createElement("input");
+	// Create inputs
+	for (let i = 0; i < need; i++) {
 
-        input.type = "text";
-        input.placeholder = "Enter Hash for Box " + (i + 1);
+		const input = document.createElement("input");
 
-        input.className = "hash-val form-input";
-        input.style.display = "block";
-        input.style.marginBottom = "10px";
+		input.type = "text";
+		input.placeholder = "Enter Hash for Box " + (i + 1);
 
-        container.appendChild(input);
-    }
+		input.className = "hash-val form-input";
+		input.style.display = "block";
+		input.style.marginBottom = "10px";
 
-    // Show verify button
-    document.getElementById("verifyBtn").style.display = "block";
+		container.appendChild(input);
+	}
 
-    alert("Now enter hash values");
+	// Show verify button
+	document.getElementById("verifyBtn").style.display = "block";
+
+	alert("Now enter hash values");
 }
 
 
 
 async function getRealHash(index) {
-    return await contract.getBoxHash(index);
+	return await contract.getBoxHash(index);
 }
 async function verifyAndIssue() {
 
-    if (currentBoxes.length === 0) {
-        alert("Request boxes first!");
-        return;
-    }
+	if (currentBoxes.length === 0) {
+		alert("Request boxes first!");
+		return;
+	}
 
-    // Get all input fields
-    const inputs = document.querySelectorAll(".hash-val");
+	// Get all input fields
+	const inputs = document.querySelectorAll(".hash-val");
 
-    if (inputs.length !== currentBoxes.length) {
-        alert("Hash count mismatch!");
-        return;
-    }
+	if (inputs.length !== currentBoxes.length) {
+		alert("Hash count mismatch!");
+		return;
+	}
 
-    let allCorrect = true;
+	let allCorrect = true;
 
-    // Loop and verify each hash
-    for (let i = 0; i < inputs.length; i++) {
+	// Loop and verify each hash
+	for (let i = 0; i < inputs.length; i++) {
 
-        const userHash = inputs[i].value.trim();
-        const realHash = await getRealHash(currentBoxes[i]);
+		const userHash = inputs[i].value.trim();
+		const realHash = await getRealHash(currentBoxes[i]);
 
-        // Console testing
-        console.log(`Box ${i + 1}`);
-        console.log("User Hash :", userHash);
-        console.log("Real Hash :", realHash);
+		// Console testing
+		console.log(`Box ${i + 1}`);
+		console.log("User Hash :", userHash);
+		console.log("Real Hash :", realHash);
 
-        if (userHash !== realHash) {
-            allCorrect = false;
-            break;
-        }
-    }
+		if (userHash !== realHash) {
+			allCorrect = false;
+			break;
+		}
+	}
 
-    // Result
-    if (!allCorrect) {
-        alert("❌ Wrong Hash! Access Denied");
-        return;
-    }
+	// Result
+	if (!allCorrect) {
+		alert("❌ Wrong Hash! Access Denied");
+		return;
+	}
 
-    alert("✅ All Hashes Verified!");
+	alert("✅ All Hashes Verified!");
 
-    await issueBoxes();
+	await issueBoxes();
 }
 
 
 async function issueBoxes() {
 
-    const sid = document.getElementById("soldier-id").value;
+	const sid = document.getElementById("soldier-id").value;
 
-    // Call blockchain
-    const tx = await contract.issuewithindexes(
-        Number(sid),
-        currentBoxes
-    );
+	// Call blockchain
+	const tx = await contract.issuewithindexes(
+		Number(sid),
+		currentBoxes
+	);
 
-    alert("Transaction Sent...");
+	alert("Transaction Sent...");
 
-    // Wait for confirmation
-    const receipt = await tx.wait();
+	// Wait for confirmation
+	const receipt = await tx.wait();
 
-    alert("Boxes Issued!");
+	alert("Boxes Issued!");
 
-    // Add to ledger
-    
+	// Add to ledger
 
-    // Reset
-    currentBoxes = [];
+
+	// Reset
+	currentBoxes = [];
 }
 
 async function loadLedgerFromBlockchain() {
 
-    const table = document.getElementById("ledgerBody");
-    table.innerHTML = "";
+	const table = document.getElementById("ledgerBody");
+	table.innerHTML = "";
 
-    const count = await contract.getRecordCount();
+	const count = await contract.getRecordCount();
+	document.getElementById("cnt").innerText = count;
+	for (let i = 0; i < count; i++) {
 
-    for (let i = 0; i < count; i++) {
+		const record = await contract.getRecord(i);
 
-        const record = await contract.getRecord(i);
+		const issuedBy = record[0];
+		const soldierId = record[1];
+		const boxIndexes = record[2];
+		const timestamp = Number(record[3]);
 
-        const issuedBy = record[0];
-        const soldierId = record[1];
-        const boxIndexes = record[2];
-        const timestamp = Number(record[3]);
+		const date = new Date(timestamp * 1000);
 
-        const date = new Date(timestamp * 1000);
+		const time =
+			date.getHours().toString().padStart(2, "0") + ":" +
+			date.getMinutes().toString().padStart(2, "0") + ":" +
+			date.getSeconds().toString().padStart(2, "0");
 
-        const time =
-            date.getHours().toString().padStart(2, "0") + ":" +
-            date.getMinutes().toString().padStart(2, "0") + ":" +
-            date.getSeconds().toString().padStart(2, "0");
+		const row = document.createElement("tr");
 
-        const row = document.createElement("tr");
-
-        row.innerHTML = `
+		row.innerHTML = `
             <td>${time}</td>
             <td>${soldierId}</td>
             <td>ISSUED</td>
             <td>${boxIndexes.join(", ")}</td>
-            <td class="tx-hash">${issuedBy.slice(0,6)}...${issuedBy.slice(-4)}</td>
+            <td class="tx-hash">${issuedBy.slice(0, 6)}...${issuedBy.slice(-4)}</td>
         `;
-
-        table.prepend(row);
-    }
+		table.prepend(row);
+	}
 }
 if (contract) {
-    contract.on("BoxesIssued", async () => {
-        await loadLedgerFromBlockchain();
-    });
+	contract.on("BoxesIssued", async () => {
+		await loadLedgerFromBlockchain();
+	});
 }
